@@ -1,0 +1,19 @@
+﻿CACHE MANIFEST
+# version 1
+
+CACHE:
+
+/Content/bootstrap.css
+/Content/Site.css
+/Content/Style.css
+
+/Scripts/jquery-1.10.2.js
+/Scripts/bootstrap.js
+/Scripts/modernizr-2.6.2.js
+/Scripts/respond.js
+
+/home
+/home/index
+
+NETWORK:
+*

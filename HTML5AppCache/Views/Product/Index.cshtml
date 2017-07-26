@@ -1,0 +1,287 @@
+﻿<h2>Products</h2>
+
+<div style="width:100%;text-align:center;clear:both">
+
+    <table id="tblProducts" class="display" cellspacing="0" data-page-length='5'>
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tfoot>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Actions</th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <button id="btnAddProduct">
+        Add Product
+    </button>
+
+    <div id="dialog-form" title="Add Product">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-3 invisible">ID</div>
+                <div id="id" class="col-md-6">
+                    <input type="number" id="txtId" class="text ui-widget-content ui-corner-all invisible" />
+                </div>
+            </div>
+
+            <div class="row" style="padding-top:5px">
+                <div class="col-md-3">Name</div>&nbsp;
+                <div id="name" class="col-md-6">
+                    <input type="text" id="txtName" class="text ui-widget-content ui-corner-all" />
+                </div>
+            </div>
+
+            <div class="row" style="padding-top:5px">
+                <div class="col-md-3">Category</div>&nbsp;
+                <div id="blog" class="col-md-6">
+                    <input type="text" id="txtCategory" class="text ui-widget-content ui-corner-all" />
+                </div>
+            </div>
+
+            <div class="row" style="padding-top:5px">
+                <div class="col-md-3">Price</div>&nbsp;
+                <div id="location" class="col-md-6">
+                    <input type="text" name="Id" id="txtPrice" class="text ui-widget-content ui-corner-all" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts{
+    <script type="text/javascript">
+
+        var product = new Array();
+
+        var isAdd = false;
+        var isEdit = false;
+
+        var indexedDB = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB;
+        var db;
+
+        if (!window.indexedDB) {
+            alert("Your browser doesn't support IndexedDB");
+        }
+
+        window.onload = function () {
+            initDb();
+            initGrid();
+        }
+
+        function initDb() {
+            var request = indexedDB.open("ProductDB", 1);
+
+            request.onsuccess = function (event) {
+                db = request.result;
+                showAllItems();
+            };
+
+            request.onerror = function (event) {
+                console.log("IndexedDB error: " + event.target.errorCode);
+            };
+
+            request.onupgradeneeded = function (event) {
+                var objectStore = event.currentTarget.result.createObjectStore("product", { keyPath: "id", autoIncrement: true });
+            };
+        }
+
+        $("#dialog-form").dialog({
+            autoOpen: false,
+            height: 300,
+            width: 350,
+            modal: true,
+            buttons: {
+                "Save": function () {
+                    if ($("#txtId").val() == 0) {
+                        addNewItem();
+                    }
+                    else {
+                        editExistingItem();
+                    }
+
+                    $(this).dialog("close");
+                },
+                Cancel: function () {
+                    $(this).dialog("close");
+                }
+            },
+            close: function () {
+            }
+        });
+
+        function showAllItems() {
+            var transaction = db.transaction(["product"], "readwrite");
+            var objectStore = transaction.objectStore("product");
+            var request = objectStore.openCursor();
+
+            request.onsuccess = function (event) {
+                var cursor = event.target.result;
+                if (cursor) {
+                    product.push({
+                        "Id": cursor.key,
+                        "Name": cursor.value.name,
+                        "Category": cursor.value.category,
+                        "Price": cursor.value.price
+                    });
+                    cursor.continue();
+                }
+                else {
+                    //After reading all products from IndexedDB, add all product data to JQuery Grid
+                    $('#tblProducts').DataTable().rows.add(product).draw();
+
+                };
+            }
+        }
+
+        function addNewItem() {
+            var pName = $('#txtName').val();
+            var pCategory = $('#txtCategory').val();
+            var pPrice = $('#txtPrice').val();
+
+            var transaction = db.transaction(["product"], "readwrite");
+            var objectStore = transaction.objectStore("product");
+            var request = objectStore.add({ name: pName, category: pCategory, price: pPrice });
+
+            request.onsuccess = function (event) {
+                //Refresh JQuery grid with newly added dataa
+                var prd = new Array();
+
+                prd.push({
+                    "Id": event.target.result,
+                    "Name": pName,
+                    "Category": pCategory,
+                    "Price": pPrice
+                });
+
+                product.push({
+                    "Id": event.target.result,
+                    "Name": pName,
+                    "Category": pCategory,
+                    "Price": pPrice
+                });
+
+                $('#tblProducts').DataTable().rows.add(prd).draw();
+            };
+        }
+
+        function editExistingItem() {
+            var transaction = db.transaction(["product"], "readwrite");
+            var objectStore = transaction.objectStore("product");
+
+            var pId = parseInt($("#txtId").val());
+
+            var result = product.find(x => x.Id == pId);
+            var i = product.indexOf(result);
+            
+            objectStore.get(pId).onsuccess = function (event) {
+                var rec = event.target.result;
+
+                rec.id = pId;
+                rec.name = $("#txtName").val();
+                rec.category = $("#txtCategory").val();
+                rec.price = $("#txtPrice").val();
+
+                if (i != -1) {
+                    product[i].Id = rec.id;
+                    product[i].Name = rec.name;
+                    product[i].Category = rec.category;
+                    product[i].Price = rec.price;
+                }
+
+                objectStore.put(rec).onsuccess = function (event) {
+                    $('#tblProducts').DataTable().clear();
+                    $('#tblProducts').DataTable().rows.add(product).draw();
+                    console.log('Updated successfully!');
+                }
+            }
+        }
+
+        $('#btnAddProduct').click(function () {
+            $("#txtId").val(0);
+            $("#txtName").val('');
+            $("#txtCategory").val('');
+            $("#txtPrice").val('');
+
+            $('#dialog-form').dialog('option', 'title', 'Add Product');
+            $("#dialog-form").dialog("open");
+
+        });
+
+        //Function to initialize empty JQuery Grid
+        function initGrid() {
+
+            var table = $('#tblProducts').DataTable({
+                data: null,
+                columns: [
+                    { data: "Id", visible: false, searchable: false },
+                    { data: "Name", className:"dt-center" },
+                    { data: "Category", className:"dt-center"},
+                    { data: "Price", className:"dt-center"},
+                    { data: "Action", className: "dt-center", defaultContent: "<button class='btn-delete'>Delete</button></div> &nbsp; <button class='btn-edit'>Edit</button>" }
+                ]
+            });
+
+            $('#tblProducts tbody').on('click', '.btn-delete', function () {
+
+                var selectedProduct = table.row($(this).parents('tr')).data();
+
+                var prd = new Array();
+
+                prd.push({
+                    "Id": selectedProduct["Id"],
+                    "Name": selectedProduct["Name"],
+                    "Category": selectedProduct["Category"],
+                    "Price": selectedProduct["Price"]
+                });
+
+                //table.row($(this).parents('tr')).remove().draw();
+                deleteItem(selectedProduct["Id"]);
+            });
+
+            $('#tblProducts tbody').on('click', '.btn-edit', function () {
+                var selectedProduct = table.row($(this).parents('tr')).data();
+
+                $("#txtId").val(selectedProduct["Id"]);
+                $("#txtName").val(selectedProduct["Name"]);
+                $("#txtCategory").val(selectedProduct["Category"]);
+                $("#txtPrice").val(selectedProduct["Price"]);
+
+                $('#dialog-form').dialog('option', 'title', 'Edit Product');
+                $("#dialog-form").dialog("open");
+            });
+        }
+
+        function deleteItem(id) {
+            var transaction = db.transaction(["product"], "readwrite");
+            var objectStore = transaction.objectStore("product");
+            var request = objectStore.delete(parseInt(id));
+
+            request.onsuccess = function (event) {
+                var result = product.find(x => x.Id == parseInt(id));
+                var i = product.indexOf(result);
+                product.splice(i, 1);
+                $('#tblProducts').DataTable().clear();
+                $('#tblProducts').DataTable().rows.add(product).draw();
+
+                console.log("Record deleted successfully!")
+            };
+            request.onerror = function (event) {
+                console.log("Error deleting record");
+            };
+        }
+
+    </script>
+}
